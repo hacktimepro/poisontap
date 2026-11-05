@@ -1,0 +1,2 @@
+/bin/sh /home/pi/poisontap/pi_startup.sh
+/usr/bin/screen -dmS attacks /home/pi/launch_attacks.sh 
