@@ -1,56 +1,48 @@
 #!/bin/sh
-#
-# PoisonTap
-#  by samy kamkar
-#  http://samy.pl/poisontap
-#  01/08/2016
-#
-# If you find this doesn't come up automatically as an ethernet device
-# change idVendor/idProduct to 0x04b3/0x4010
 
+rmmod g_ether
 cd /sys/kernel/config/usb_gadget/
 mkdir -p poisontap
 cd poisontap
 
-#echo 0x04b3 > idVendor  # IN CASE BELOW DOESN'T WORK
-#echo 0x4010 > idProduct # IN CASE BELOW DOESN'T WORK
-echo 0x1d6b > idVendor   # Linux Foundation
-echo 0x0104 > idProduct  # Multifunction Composite Gadget
+echo 0x0525 > idVendor
+echo 0xa4a2 > idProduct
 
-echo 0x0100 > bcdDevice # v1.0.0
-echo 0x0200 > bcdUSB # USB2
 mkdir -p strings/0x409
-echo "badc0deddeadbeef" > strings/0x409/serialnumber
-echo "Samy Kamkar" > strings/0x409/manufacturer
-echo "PoisonTap" > strings/0x409/product
-mkdir -p configs/c.1/strings/0x409
-echo "Config 1: ECM network" > configs/c.1/strings/0x409/configuration
-echo 250 > configs/c.1/MaxPower
+echo "Realtek Semiconductor Corp." > strings/0x409/manufacturer
+echo "USB 10/100 LAN" > strings/0x409/product
 
+# RNDIS
+mkdir configs/c.2
+echo "0xC0" > configs/c.2/bmAttributes
+echo "1" > configs/c.2/MaxPower
+mkdir configs/c.2/strings/0x409
+echo "RNDIS" > configs/c.2/strings/0x409/configuration
+echo "1" > os_desc/use
+echo "0xcd" > os_desc/b_vendor_code
+echo "MSFT100" > os_desc/qw_sign
 
-mkdir -p functions/acm.usb0
-ln -s functions/acm.usb0 configs/c.1/
-# End functions
+mkdir functions/rndis.usb0
+echo "42:61:64:55:53:45" > functions/rndis.usb0/dev_addr
+echo "48:6f:73:74:50:44" > functions/rndis.usb0/host_addr
+echo "RNDIS" > functions/rndis.usb0/os_desc/interface.rndis/compatible_id
+echo "5162001" > functions/rndis.usb0/os_desc/interface.rndis/sub_compatible_id
 
+ln -s functions/rndis.usb0 configs/c.2
+ln -s configs/c.2 os_desc
 
-mkdir -p functions/ecm.usb0
-# first byte of address must be even
-HOST="48:6f:73:74:50:43"
-SELF="42:61:64:55:53:42"
-echo $HOST > functions/ecm.usb0/host_addr
-echo $SELF > functions/ecm.usb0/dev_addr
-ln -s functions/ecm.usb0 configs/c.1/
 ls /sys/class/udc > UDC
+modprobe g_ether
 
-
+sleep 10
 ifup usb0
 ifconfig usb0 up
 /sbin/route add -net 0.0.0.0/0 usb0
-/etc/init.d/isc-dhcp-server start
+/etc/init.d/isc-dhcp-server restart
 
 /sbin/sysctl -w net.ipv4.ip_forward=1
-/sbin/iptables -t nat -A PREROUTING -i usb0 -p tcp --dport 80 -j REDIRECT --to-port 1337
-/usr/bin/screen -dmS dnsspoof /usr/sbin/dnsspoof -i usb0 port 53
-/usr/bin/screen -dmS node /usr/bin/nodejs /home/pi/poisontap/pi_poisontap.js 
+#/sbin/iptables -t nat -A PREROUTING -i usb0 -p tcp --dport 80 -j REDIRECT --to-port 1337
+#/usr/bin/screen -dmS dnsspoof /usr/sbin/dnsspoof -i usb0 port 53
+#/usr/bin/screen -dmS node /usr/bin/nodejs /home/pi/poisontap/pi_poisontap.js
 
-
+iptables -t nat -A POSTROUTING -o usb0 -j MASQUERADE
