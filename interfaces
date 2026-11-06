@@ -1,0 +1,5 @@
+# собственные настройки беспроводной сети на ВаdUSВ-плате:
+auto wlan0 
+iface wlan0 inet static 
+  address 2.0.0.1 
+  netmask 255.255.255.0 
